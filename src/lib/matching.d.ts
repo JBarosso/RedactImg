@@ -32,6 +32,8 @@ export type MatchResult<F extends ScannedFile = ScannedFile> = {
 
 export type PlannedOutput<F extends ScannedFile = ScannedFile> = Task<F> & {
   name: string;
+  dir: string;
+  outPath: string;
   namedFromEan: boolean;
 };
 
@@ -53,5 +55,5 @@ export function matchFiles<F extends ScannedFile>(
 ): MatchResult<F>;
 export function planOutputs<F extends ScannedFile>(
   tasks: Task<F>[],
-  opts?: { ext?: string },
+  opts?: { ext?: string; nameTemplate?: string },
 ): OutputPlan<F>;

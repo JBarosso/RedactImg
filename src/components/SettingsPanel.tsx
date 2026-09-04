@@ -148,6 +148,21 @@ export function SettingsPanel({ settings, set, reset }: Props) {
             />
           )}
 
+          <div className="space-y-2">
+            <Label htmlFor="tpl">Modèle de nommage</Label>
+            <Input
+              id="tpl"
+              value={settings.nameTemplate}
+              onChange={(e) => set('nameTemplate', e.target.value || '{ean}')}
+              spellCheck={false}
+              className="font-mono"
+            />
+            <p className="text-muted-foreground text-xs">
+              Variables : <code>{'{ean}'}</code> EAN du produit, <code>{'{code}'}</code> code interne.
+              Les suffixes <code>_1</code> <code>_2</code>… sont ajoutés automatiquement quand plusieurs fichiers correspondent à la même référence.
+            </p>
+          </div>
+
           <Toggle
             label="Une seule image par référence"
             hint="Quand plusieurs fichiers correspondent, ne traiter que le premier."

@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { zipSync } from 'fflate';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -20,7 +21,7 @@ import { ReportPanel, Stat, type Section } from '@/components/ReportPanel';
 import { matchFiles, parseReferences, planOutputs } from '@/lib/matching.js';
 import type { MatchedOn } from '@/lib/matching.js';
 import { runBatch, type BatchFailure } from '@/lib/pool';
-import { createWriter, hasFileSystemAccess } from '@/lib/output';
+import { createWriter, download, hasFileSystemAccess } from '@/lib/output';
 import type { Scanned } from '@/lib/scan';
 import { useSettings, useTheme } from '@/lib/settings';
 
@@ -53,9 +54,36 @@ export default function App() {
     [files, parsed.refs, settings.firstOnly],
   );
   const plan = useMemo(
-    () => planOutputs(match.tasks, { ext: settings.format }),
-    [match.tasks, settings.format],
+    () => planOutputs(match.tasks, { ext: settings.format, nameTemplate: settings.nameTemplate }),
+    [match.tasks, settings.format, settings.nameTemplate],
   );
+
+  // Traite et télécharge des fichiers non appariés (section "inutilisées").
+  const downloadFiles = useCallback(async (filesToProcess: File[]) => {
+    const ac = new AbortController();
+    const results: { blob: Blob; name: string }[] = [];
+    await runBatch(
+      filesToProcess.map((f) => ({
+        name: f.name.replace(/\.[^.]+$/, '') + '.' + settings.format,
+        file: f,
+        source: f.name,
+      })),
+      settings,
+      {
+        write: async (item, blob) => { results.push({ blob, name: item.name }); },
+        onProgress: () => {},
+      },
+      ac.signal,
+    );
+    if (results.length === 1) {
+      download(results[0].blob, results[0].name);
+    } else {
+      const entries: Record<string, Uint8Array> = {};
+      for (const r of results) entries[r.name] = new Uint8Array(await r.blob.arrayBuffer());
+      const zipped = zipSync(entries, { level: 0 });
+      download(new Blob([zipped as unknown as BlobPart], { type: 'application/zip' }), 'redacimg-selection.zip');
+    }
+  }, [settings]);
 
   const running = progress !== null;
   const problems =
@@ -116,6 +144,8 @@ export default function App() {
         tone: 'warn',
         headers: ['Fichier'],
         rows: match.unused.map((f) => [f.path]),
+        rowFiles: match.unused.map((f) => f.file),
+        onDownload: downloadFiles,
       },
       {
         id: 'lignes',
@@ -159,7 +189,7 @@ export default function App() {
     setTab('rapport');
 
     const items = plan.outputs.map((o) => ({
-      name: o.name,
+      name: o.outPath,
       file: o.file.file as File,
       source: o.file.path,
     }));

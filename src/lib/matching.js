@@ -183,7 +183,17 @@ export function matchFiles(files, refs, { firstOnly = false } = {}) {
  * @param {{ref: Ref, file: {path:string}, matchedOn: string}[]} tasks
  * @param {{ext?: string}} [opts] extension du format de sortie choisi
  */
-export function planOutputs(tasks, { ext = 'tif' } = {}) {
+function applyTemplate(template, ref) {
+  const s = template
+    .replace('{ean}', ref.ean ?? '')
+    .replace('{code}', ref.code ?? '')
+    .replace(/[-_\s]+$/, '')
+    .replace(/^[-_\s]+/, '')
+    .trim();
+  return s || (ref.ean ?? ref.code);
+}
+
+export function planOutputs(tasks, { ext = 'tif', nameTemplate = '{ean}' } = {}) {
   const byRef = new Map();
   for (const task of tasks) {
     if (!byRef.has(task.ref)) byRef.set(task.ref, []);
@@ -192,7 +202,7 @@ export function planOutputs(tasks, { ext = 'tif' } = {}) {
 
   const byStem = new Map();
   for (const ref of byRef.keys()) {
-    const stem = ref.ean ?? ref.code;
+    const stem = applyTemplate(nameTemplate, ref);
     if (!byStem.has(stem)) byStem.set(stem, []);
     byStem.get(stem).push(ref);
   }
@@ -207,11 +217,10 @@ export function planOutputs(tasks, { ext = 'tif' } = {}) {
     const [ref] = refs;
     const list = byRef.get(ref);
     list.forEach((task, i) => {
-      outputs.push({
-        ...task,
-        name: list.length === 1 ? `${stem}.${ext}` : `${stem}_${i + 1}.${ext}`,
-        namedFromEan: Boolean(ref.ean),
-      });
+      const baseName = list.length === 1 ? `${stem}.${ext}` : `${stem}_${i + 1}.${ext}`;
+      const dir = splitPath(task.file.path).dir;
+      const outPath = dir ? `${dir}/${baseName}` : baseName;
+      outputs.push({ ...task, name: baseName, dir, outPath, namedFromEan: Boolean(ref.ean) });
     });
   }
 

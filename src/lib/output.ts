@@ -10,27 +10,77 @@ export type Writer = {
 
 export const hasFileSystemAccess = 'showDirectoryPicker' in globalThis;
 
+// IndexedDB – persiste le dernier dossier pour que le picker s'y ouvre.
+const IDB = { name: 'redacimg', store: 'handles', key: 'last' };
+
+function openIdb(): Promise<IDBDatabase> {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(IDB.name, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB.store);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+function saveLastDir(handle: FileSystemDirectoryHandle): void {
+  openIdb()
+    .then((db) => {
+      db.transaction(IDB.store, 'readwrite').objectStore(IDB.store).put(handle, IDB.key);
+    })
+    .catch(() => {});
+}
+
+async function loadLastDir(): Promise<FileSystemDirectoryHandle | null> {
+  try {
+    const db = await openIdb();
+    return await new Promise((res, rej) => {
+      const tx = db.transaction(IDB.store, 'readonly');
+      const req = tx.objectStore(IDB.store).get(IDB.key);
+      req.onsuccess = () => res((req.result as FileSystemDirectoryHandle) ?? null);
+      req.onerror = () => rej(req.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Crée les sous-dossiers nécessaires et écrit le fichier.
+async function writeNested(root: FileSystemDirectoryHandle, path: string, blob: Blob) {
+  const parts = path.split('/');
+  const fileName = parts.pop()!;
+  let dir: FileSystemDirectoryHandle = root;
+  for (const part of parts) {
+    dir = await dir.getDirectoryHandle(part, { create: true });
+  }
+  const fh = await dir.getFileHandle(fileName, { create: true });
+  const stream = await fh.createWritable();
+  await stream.write(blob);
+  await stream.close();
+}
+
 /**
  * Écriture directe dans un dossier si le navigateur le permet, sinon ZIP.
- * À appeler depuis un clic : le sélecteur de dossier exige un geste utilisateur.
+ * Le picker s'ouvre dans le dernier dossier choisi grâce à `startIn`.
  */
 export async function createWriter(): Promise<Writer> {
   if (hasFileSystemAccess) {
+    const last = await loadLastDir();
     const dir = await (
       globalThis as unknown as {
-        showDirectoryPicker(o: { mode: string }): Promise<FileSystemDirectoryHandle>;
+        showDirectoryPicker(o: {
+          mode: string;
+          startIn?: FileSystemDirectoryHandle;
+        }): Promise<FileSystemDirectoryHandle>;
       }
-    ).showDirectoryPicker({ mode: 'readwrite' });
+    ).showDirectoryPicker({ mode: 'readwrite', ...(last ? { startIn: last } : {}) });
 
+    saveLastDir(dir);
     let total = 0;
     return {
       kind: 'disk',
       label: dir.name,
       async write(name, blob) {
-        const handle = await dir.getFileHandle(name, { create: true });
-        const stream = await handle.createWritable();
-        await stream.write(blob);
-        await stream.close();
+        await writeNested(dir, name, blob);
         total += blob.size;
       },
       async finish() {},
@@ -38,8 +88,7 @@ export async function createWriter(): Promise<Writer> {
     };
   }
 
-  // Repli : tout reste en mémoire jusqu'au téléchargement. Sur un très gros
-  // lot c'est le point de rupture — d'où l'avertissement affiché dans l'app.
+  // Repli : tout reste en mémoire jusqu'au téléchargement.
   const files: Record<string, Uint8Array> = {};
   let total = 0;
   return {
@@ -51,7 +100,6 @@ export async function createWriter(): Promise<Writer> {
     },
     async finish() {
       if (!Object.keys(files).length) return;
-      // level 0 : les images sont déjà compressées, recompresser ne gagne rien.
       const zip = zipSync(files, { level: 0 });
       download(new Blob([zip as unknown as BlobPart], { type: 'application/zip' }), 'redacimg.zip');
     },

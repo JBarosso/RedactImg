@@ -13,6 +13,7 @@ export type Settings = {
   quality: number;        // JPEG / WebP, 1-100
   tiffDeflate: boolean;
   firstOnly: boolean;
+  nameTemplate: string;
 };
 
 export const DEFAULTS: Settings = {
@@ -25,6 +26,7 @@ export const DEFAULTS: Settings = {
   quality: 90,
   tiffDeflate: true,
   firstOnly: false,
+  nameTemplate: '{ean}',
 };
 
 export const FORMAT_LABEL: Record<OutputFormat, string> = {
