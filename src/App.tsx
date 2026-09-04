@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileArchive,
+  FolderMinus,
   HardDriveDownload,
   Moon,
   Play,
@@ -45,6 +46,8 @@ export default function App() {
   const [refsText, setRefsText] = useState('');
   const [tab, setTab] = useState('preparer');
   const [progress, setProgress] = useState<{ done: number; total: number; label: string } | null>(null);
+  const [showAllPreview, setShowAllPreview] = useState(false);
+  const [flatOutput, setFlatOutput] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
   const abort = useRef<AbortController | null>(null);
 
@@ -53,10 +56,10 @@ export default function App() {
     () => matchFiles(files, parsed.refs, { firstOnly: settings.firstOnly }),
     [files, parsed.refs, settings.firstOnly],
   );
-  const plan = useMemo(
-    () => planOutputs(match.tasks, { ext: settings.format, nameTemplate: settings.nameTemplate }),
-    [match.tasks, settings.format, settings.nameTemplate],
-  );
+  const plan = useMemo(() => {
+    setShowAllPreview(false);
+    return planOutputs(match.tasks, { ext: settings.format, nameTemplate: settings.nameTemplate });
+  }, [match.tasks, settings.format, settings.nameTemplate]);
 
   // Traite et télécharge des fichiers non appariés (section "inutilisées").
   const downloadFiles = useCallback(async (filesToProcess: File[]) => {
@@ -189,7 +192,7 @@ export default function App() {
     setTab('rapport');
 
     const items = plan.outputs.map((o) => ({
-      name: o.outPath,
+      name: flatOutput ? o.name : o.outPath,
       file: o.file.file as File,
       source: o.file.path,
     }));
@@ -282,10 +285,13 @@ export default function App() {
                 <CardTitle>Aperçu du lot — {plan.outputs.length} image(s)</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-1 font-mono text-sm">
-                  {plan.outputs.slice(0, 6).map((o) => (
-                    <li key={o.name} className="flex flex-wrap items-center gap-2">
-                      <span className="text-primary font-semibold">{o.name}</span>
+                <ul
+                  className="space-y-1 font-mono text-sm"
+                  style={showAllPreview ? { maxHeight: '18rem', overflowY: 'auto' } : undefined}
+                >
+                  {(showAllPreview ? plan.outputs : plan.outputs.slice(0, 6)).map((o) => (
+                    <li key={o.outPath} className="flex flex-wrap items-center gap-2">
+                      <span className="text-primary font-semibold">{o.outPath}</span>
                       <span className="text-muted-foreground">← {o.file.path}</span>
                       <span className="bg-muted rounded-full px-2 py-0.5 text-xs">
                         {MATCHED_ON[o.matchedOn]}
@@ -293,10 +299,24 @@ export default function App() {
                     </li>
                   ))}
                 </ul>
-                {plan.outputs.length > 6 && (
+                {plan.outputs.length > 6 && !showAllPreview && (
                   <p className="text-muted-foreground mt-2 text-sm">
-                    … et {plan.outputs.length - 6} autre(s).
+                    … et {plan.outputs.length - 6} autre(s).{' '}
+                    <button
+                      onClick={() => setShowAllPreview(true)}
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      Afficher tout
+                    </button>
                   </p>
+                )}
+                {showAllPreview && (
+                  <button
+                    onClick={() => setShowAllPreview(false)}
+                    className="text-muted-foreground mt-2 text-sm underline-offset-2 hover:underline"
+                  >
+                    Réduire
+                  </button>
                 )}
               </CardContent>
             </Card>
@@ -355,6 +375,21 @@ export default function App() {
                     <FileArchive className="size-4" /> Sortie en ZIP
                   </span>
                 )}
+                <label
+                  className={`flex cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2 text-sm transition-colors select-none ${
+                    flatOutput ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted/50'
+                  }`}
+                  title="Ignore la structure de dossiers : toutes les images sont écrites à la racine du dossier de destination."
+                >
+                  <input
+                    type="checkbox"
+                    checked={flatOutput}
+                    onChange={(e) => setFlatOutput(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <FolderMinus className="size-4" />
+                  Sortie à plat
+                </label>
                 <Button size="lg" onClick={start} disabled={plan.outputs.length === 0}>
                   {hasFileSystemAccess ? <HardDriveDownload /> : <Play />}
                   Lancer le traitement

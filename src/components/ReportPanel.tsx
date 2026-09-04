@@ -204,19 +204,21 @@ export function ReportPanel({ sections }: { sections: Section[] }) {
                   <Table>
                     <TableHeader className="bg-muted/60 sticky top-0">
                       <TableRow>
-                        {section.rowFiles && <TableHead className="w-20">Aperçu</TableHead>}
+                        {section.rowFiles && <TableHead className="w-20 min-w-[80px]">Aperçu</TableHead>}
                         {section.headers.map((h) => (
                           <TableHead key={h}>{h}</TableHead>
                         ))}
-                        {hasActions && <TableHead className="w-12">DL</TableHead>}
                         {hasActions && (
-                          <TableHead className="bg-muted/60 sticky right-0 w-10 text-center">
-                            <input
-                              type="checkbox"
-                              checked={allChecked}
-                              onChange={() => toggleAll(section.id, section.rows.length)}
-                              className="accent-primary cursor-pointer"
-                            />
+                          <TableHead className="bg-muted sticky right-0 w-20">
+                            <div className="flex items-center justify-center gap-2">
+                              <span>DL</span>
+                              <input
+                                type="checkbox"
+                                checked={allChecked}
+                                onChange={() => toggleAll(section.id, section.rows.length)}
+                                className="accent-primary cursor-pointer"
+                              />
+                            </div>
                           </TableHead>
                         )}
                       </TableRow>
@@ -227,7 +229,7 @@ export function ReportPanel({ sections }: { sections: Section[] }) {
                         return (
                           <TableRow key={i} data-state={sel.has(i) ? 'selected' : undefined}>
                             {section.rowFiles && (
-                              <TableCell className="py-2">
+                              <TableCell className="w-20 min-w-[80px] py-2">
                                 {file ? (
                                   <Thumbnail file={file} onExpand={setLightboxFile} />
                                 ) : null}
@@ -239,28 +241,28 @@ export function ReportPanel({ sections }: { sections: Section[] }) {
                               </TableCell>
                             ))}
                             {hasActions && (
-                              <TableCell>
-                                {file && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-8"
-                                    title="Télécharger cette image traitée"
-                                    onClick={() => section.onDownload?.([file])}
-                                  >
-                                    <Download className="size-4" />
-                                  </Button>
-                                )}
-                              </TableCell>
-                            )}
-                            {hasActions && (
-                              <TableCell className="bg-card sticky right-0 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={sel.has(i)}
-                                  onChange={() => toggleRow(section.id, i)}
-                                  className="accent-primary cursor-pointer"
-                                />
+                              <TableCell className={`sticky right-0 ${sel.has(i) ? 'bg-muted' : 'bg-card'}`}>
+                                <div className="flex items-center justify-center gap-2">
+                                  {file ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-8 shrink-0"
+                                      title="Télécharger cette image traitée"
+                                      onClick={() => section.onDownload?.([file])}
+                                    >
+                                      <Download className="size-4" />
+                                    </Button>
+                                  ) : (
+                                    <span className="size-8 shrink-0" />
+                                  )}
+                                  <input
+                                    type="checkbox"
+                                    checked={sel.has(i)}
+                                    onChange={() => toggleRow(section.id, i)}
+                                    className="accent-primary cursor-pointer"
+                                  />
+                                </div>
                               </TableCell>
                             )}
                           </TableRow>
