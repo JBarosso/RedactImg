@@ -16,11 +16,11 @@ export type Settings = {
 };
 
 export const DEFAULTS: Settings = {
-  width: 2000,
-  height: 2000,
-  mode: 'pad',
+  width: 850,
+  height: 850,
+  mode: 'cover',
   background: '#ffffff',
-  allowUpscale: false,
+  allowUpscale: true,
   format: 'tif',
   quality: 90,
   tiffDeflate: true,
