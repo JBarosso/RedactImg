@@ -85,7 +85,7 @@ export function SettingsPanel({ settings, set, reset }: Props) {
                 type="color"
                 value={settings.background}
                 onChange={(e) => set('background', e.target.value)}
-                className="border-input size-10 cursor-pointer rounded-xl border bg-transparent p-1"
+                className="border-input size-10 cursor-pointer rounded-[8px] border bg-transparent p-1"
               />
               <span className="text-muted-foreground text-sm">
                 Utilisée pour les marges, et pour aplatir les PNG transparents.

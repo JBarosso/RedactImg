@@ -237,7 +237,7 @@ export default function App() {
                 spellCheck={false}
                 rows={8}
                 placeholder={'PRETJ5\t7040353498027\nPRETR3\t7040353500027'}
-                className="rounded-2xl font-mono text-sm"
+                className="max-h-72 overflow-y-auto rounded-2xl font-mono text-sm"
               />
               <p className="text-muted-foreground text-sm">
                 Un produit par ligne : code interne et EAN, séparés par une tabulation ou des
