@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Palette pastel : crème, menthe, pêche, lavande. */
+:root {
+  --radius: 1rem;
+  --background: #fdf6ec;
+  --foreground: #4a3f55;
+  --card: #fffcf7;
+  --card-foreground: #4a3f55;
+  --popover: #fffcf7;
+  --popover-foreground: #4a3f55;
+  --primary: #35a086;
+  --primary-foreground: #ffffff;
+  --secondary: #ffe3d3;
+  --secondary-foreground: #6b4a3a;
+  --muted: #f6ede3;
+  --muted-foreground: #7d7086;
+  --accent: #e6ddfb;
+  --accent-foreground: #4a3f55;
+  --destructive: #c2415a;
+  --destructive-foreground: #ffffff;
+  --border: #ead9c8;
+  --input: #ead9c8;
+  --ring: #35a086;
+  --sky: #cfe6f7;
+  --sun: #ffd9a0;
+}
+
+.dark {
+  --background: #221d2c;
+  --foreground: #f2e9f5;
+  --card: #2c2537;
+  --card-foreground: #f2e9f5;
+  --popover: #2c2537;
+  --popover-foreground: #f2e9f5;
+  --primary: #7ed4b8;
+  --primary-foreground: #10312a;
+  --secondary: #3d3348;
+  --secondary-foreground: #ffd9c4;
+  --muted: #322a3e;
+  --muted-foreground: #b3a6bc;
+  --accent: #453a55;
+  --accent-foreground: #e6ddfb;
+  --destructive: #f2929a;
+  --destructive-foreground: #2a1016;
+  --border: #453a55;
+  --input: #453a55;
+  --ring: #7ed4b8;
+  --sky: #34405c;
+  --sun: #6b5535;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sky: var(--sky);
+  --color-sun: var(--sun);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: 'Segoe UI Variable Display', 'Segoe UI', ui-rounded, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(60rem 40rem at 110% -10%, var(--accent) 0%, transparent 60%),
+      radial-gradient(50rem 35rem at -10% 0%, var(--sky) 0%, transparent 55%);
+    background-attachment: fixed;
+  }
+  /* Chiffres alignés dans les tableaux du rapport. */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+}
