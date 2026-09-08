@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { zipSync } from 'fflate';
 import {
   AlertTriangle,
@@ -56,10 +56,13 @@ export default function App() {
     () => matchFiles(files, parsed.refs, { firstOnly: settings.firstOnly }),
     [files, parsed.refs, settings.firstOnly],
   );
-  const plan = useMemo(() => {
-    setShowAllPreview(false);
-    return planOutputs(match.tasks, { ext: settings.format, nameTemplate: settings.nameTemplate });
-  }, [match.tasks, settings.format, settings.nameTemplate]);
+  const plan = useMemo(
+    () => planOutputs(match.tasks, { ext: settings.format, nameTemplate: settings.nameTemplate }),
+    [match.tasks, settings.format, settings.nameTemplate],
+  );
+
+  useEffect(() => { setShowAllPreview(false); }, [match.tasks]);
+
 
   // Traite et télécharge des fichiers non appariés (section "inutilisées").
   const downloadFiles = useCallback(async (filesToProcess: File[]) => {
