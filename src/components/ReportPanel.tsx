@@ -34,7 +34,7 @@ const TONE = {
 // ── Thumbnail ──────────────────────────────────────────────────────────────
 // Crée et révoque son propre object URL. Passe le File (pas l'URL) à onExpand
 // pour que la lightbox gère sa propre URL indépendamment.
-function useObjectUrl(file: File) {
+export function useObjectUrl(file: File) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     const u = URL.createObjectURL(file);
@@ -44,7 +44,7 @@ function useObjectUrl(file: File) {
   return url;
 }
 
-function Thumbnail({ file, onExpand }: { file: File; onExpand: (f: File) => void }) {
+export function Thumbnail({ file, onExpand }: { file: File; onExpand: (f: File) => void }) {
   const url = useObjectUrl(file);
   if (!url) return <div className="size-16 rounded-[6px] bg-muted animate-pulse" />;
   return (
@@ -58,7 +58,7 @@ function Thumbnail({ file, onExpand }: { file: File; onExpand: (f: File) => void
 }
 
 // ── Lightbox ───────────────────────────────────────────────────────────────
-function Lightbox({ file, onClose }: { file: File; onClose: () => void }) {
+export function Lightbox({ file, onClose }: { file: File; onClose: () => void }) {
   const url = useObjectUrl(file);
 
   useEffect(() => {
@@ -86,8 +86,8 @@ function Lightbox({ file, onClose }: { file: File; onClose: () => void }) {
 }
 
 // ── ResizableTableContainer ────────────────────────────────────────────────
-function ResizableTableContainer({ children }: { children: React.ReactNode }) {
-  const [height, setHeight] = useState(320);
+export function ResizableTableContainer({ children, initialHeight = 320 }: { children: React.ReactNode; initialHeight?: number }) {
+  const [height, setHeight] = useState(initialHeight);
   const dragging = useRef(false);
   const startY = useRef(0);
   const startH = useRef(0);

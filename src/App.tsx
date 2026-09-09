@@ -18,7 +18,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dropzone } from '@/components/Dropzone';
 import { SettingsPanel } from '@/components/SettingsPanel';
-import { ReportPanel, Stat, type Section } from '@/components/ReportPanel';
+import { Lightbox, ReportPanel, ResizableTableContainer, Stat, Thumbnail, useObjectUrl, type Section } from '@/components/ReportPanel';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { matchFiles, parseReferences, planOutputs } from '@/lib/matching.js';
 import type { MatchedOn } from '@/lib/matching.js';
 import { runBatch, type BatchFailure } from '@/lib/pool';
@@ -46,8 +54,9 @@ export default function App() {
   const [refsText, setRefsText] = useState('');
   const [tab, setTab] = useState('preparer');
   const [progress, setProgress] = useState<{ done: number; total: number; label: string } | null>(null);
-  const [showAllPreview, setShowAllPreview] = useState(false);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [flatOutput, setFlatOutput] = useState(false);
+  const [lightboxFile, setLightboxFile] = useState<File | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const abort = useRef<AbortController | null>(null);
 
@@ -61,7 +70,7 @@ export default function App() {
     [match.tasks, settings.format, settings.nameTemplate],
   );
 
-  useEffect(() => { setShowAllPreview(false); }, [match.tasks]);
+  useEffect(() => { setExcluded(new Set()); }, [match.tasks]);
 
 
   // Traite et télécharge des fichiers non appariés (section "inutilisées").
@@ -92,6 +101,10 @@ export default function App() {
   }, [settings]);
 
   const running = progress !== null;
+  const selectedOutputs = useMemo(
+    () => plan.outputs.filter((o) => !excluded.has(o.outPath)),
+    [plan.outputs, excluded],
+  );
   const problems =
     match.missing.length + match.ambiguous.length + plan.collisions.length + parsed.invalid.length;
 
@@ -191,10 +204,10 @@ export default function App() {
     const controller = new AbortController();
     abort.current = controller;
     setResult(null);
-    setProgress({ done: 0, total: plan.outputs.length, label: '' });
+    setProgress({ done: 0, total: selectedOutputs.length, label: '' });
     setTab('rapport');
 
-    const items = plan.outputs.map((o) => ({
+    const items = selectedOutputs.map((o) => ({
       name: flatOutput ? o.name : o.outPath,
       file: o.file.file as File,
       source: o.file.path,
@@ -222,6 +235,7 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 pb-40 pt-8">
+      {lightboxFile && <Lightbox file={lightboxFile} onClose={() => setLightboxFile(null)} />}
       <header className="mb-8 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <img src="./icon-192.png" alt="" className="size-12 rounded-2xl shadow-sm" />
@@ -247,82 +261,63 @@ export default function App() {
         </TabsList>
 
         <TabsContent value="preparer" className="space-y-5">
-          <Dropzone
-            files={files}
-            images={match.tasks.length + match.unused.length + match.ambiguous.length}
-            onAdd={(added) =>
-              setFiles((current) => {
-                const byPath = new Map(current.map((f) => [f.path, f]));
-                for (const f of added) byPath.set(f.path, f);
-                return [...byPath.values()];
-              })
-            }
-            onClear={() => setFiles([])}
-            disabled={running}
-          />
+          <div className="grid gap-5 md:grid-cols-2">
+            <Dropzone
+              files={files}
+              images={match.tasks.length + match.unused.length + match.ambiguous.length}
+              onAdd={(added) =>
+                setFiles((current) => {
+                  const byPath = new Map(current.map((f) => [f.path, f]));
+                  for (const f of added) byPath.set(f.path, f);
+                  return [...byPath.values()];
+                })
+              }
+              onClear={() => setFiles([])}
+              disabled={running}
+            />
 
-          <Card className="rounded-3xl">
-            <CardHeader>
-              <CardTitle>Liste des références</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                value={refsText}
-                onChange={(e) => setRefsText(e.target.value)}
-                disabled={running}
-                spellCheck={false}
-                rows={8}
-                placeholder={'PRETJ5\t7040353498027\nPRETR3\t7040353500027'}
-                className="max-h-72 overflow-y-auto rounded-2xl font-mono text-sm"
-              />
-              <p className="text-muted-foreground text-sm">
-                Un produit par ligne : code interne et EAN, séparés par une tabulation ou des
-                espaces. Collez directement depuis Excel.
-              </p>
-            </CardContent>
-          </Card>
-
-          {plan.outputs.length > 0 && (
             <Card className="rounded-3xl">
               <CardHeader>
-                <CardTitle>Aperçu du lot — {plan.outputs.length} image(s)</CardTitle>
+                <CardTitle>Liste des références</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul
-                  className="space-y-1 font-mono text-sm"
-                  style={showAllPreview ? { maxHeight: '18rem', overflowY: 'auto' } : undefined}
-                >
-                  {(showAllPreview ? plan.outputs : plan.outputs.slice(0, 6)).map((o) => (
-                    <li key={o.outPath} className="flex flex-wrap items-center gap-2">
-                      <span className="text-primary font-semibold">{o.outPath}</span>
-                      <span className="text-muted-foreground">← {o.file.path}</span>
-                      <span className="bg-muted rounded-full px-2 py-0.5 text-xs">
-                        {MATCHED_ON[o.matchedOn]}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {plan.outputs.length > 6 && !showAllPreview && (
-                  <p className="text-muted-foreground mt-2 text-sm">
-                    … et {plan.outputs.length - 6} autre(s).{' '}
-                    <button
-                      onClick={() => setShowAllPreview(true)}
-                      className="text-primary underline-offset-2 hover:underline"
-                    >
-                      Afficher tout
-                    </button>
-                  </p>
-                )}
-                {showAllPreview && (
-                  <button
-                    onClick={() => setShowAllPreview(false)}
-                    className="text-muted-foreground mt-2 text-sm underline-offset-2 hover:underline"
-                  >
-                    Réduire
-                  </button>
-                )}
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={refsText}
+                  onChange={(e) => setRefsText(e.target.value)}
+                  disabled={running}
+                  spellCheck={false}
+                  rows={8}
+                  placeholder={'PRETJ5\t7040353498027\nPRETR3\t7040353500027'}
+                  className="max-h-72 overflow-y-auto rounded-2xl font-mono text-sm"
+                />
+                <p className="text-muted-foreground text-sm">
+                  Un produit par ligne : code interne et EAN, séparés par une tabulation ou des
+                  espaces. Collez directement depuis Excel.
+                </p>
               </CardContent>
             </Card>
+          </div>
+
+          {plan.outputs.length > 0 && (
+            <SelectionTable
+              outputs={plan.outputs}
+              excluded={excluded}
+              onToggle={(key) =>
+                setExcluded((prev) => {
+                  const next = new Set(prev);
+                  next.has(key) ? next.delete(key) : next.add(key);
+                  return next;
+                })
+              }
+              onToggleAll={() =>
+                setExcluded((prev) =>
+                  prev.size === plan.outputs.length
+                    ? new Set()
+                    : new Set(plan.outputs.map((o) => o.outPath)),
+                )
+              }
+              onExpand={setLightboxFile}
+            />
           )}
         </TabsContent>
 
@@ -368,7 +363,7 @@ export default function App() {
           ) : (
             <>
               <div className="flex flex-1 flex-wrap gap-2">
-                <Stat label="images à traiter" value={plan.outputs.length} tone="info" />
+                <Stat label="images à traiter" value={selectedOutputs.length} tone="info" />
                 <Stat label="références lues" value={parsed.refs.length} tone="info" />
                 <Stat label="points à vérifier" value={problems} tone={problems ? 'bad' : 'info'} />
               </div>
@@ -393,7 +388,7 @@ export default function App() {
                   <FolderMinus className="size-4" />
                   Sortie à plat
                 </label>
-                <Button size="lg" onClick={start} disabled={plan.outputs.length === 0}>
+                <Button size="lg" onClick={start} disabled={selectedOutputs.length === 0}>
                   {hasFileSystemAccess ? <HardDriveDownload /> : <Play />}
                   Lancer le traitement
                 </Button>
@@ -403,5 +398,104 @@ export default function App() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── SelectionTable ─────────────────────────────────────────────────────────
+type SelectionTableProps = {
+  outputs: import('@/lib/matching.js').PlannedOutput<import('@/lib/scan').Scanned>[];
+  excluded: Set<string>;
+  onToggle: (key: string) => void;
+  onToggleAll: () => void;
+  onExpand: (f: File) => void;
+};
+
+function SelectionRow({
+  output,
+  checked,
+  onToggle,
+  onExpand,
+}: {
+  output: SelectionTableProps['outputs'][number];
+  checked: boolean;
+  onToggle: () => void;
+  onExpand: (f: File) => void;
+}) {
+  const file = output.file.file as File | undefined;
+  return (
+    <TableRow data-state={!checked ? 'selected' : undefined}>
+      <TableCell className="w-20 min-w-[80px] py-2">
+        {file ? <Thumbnail file={file} onExpand={onExpand} /> : null}
+      </TableCell>
+      <TableCell className="font-mono text-sm font-medium">{output.outPath}</TableCell>
+      <TableCell className="text-muted-foreground font-mono text-sm">{output.file.path}</TableCell>
+      <TableCell
+        className={`sticky right-0 w-24 min-w-[96px] cursor-pointer select-none text-center ${checked ? 'bg-card' : 'bg-muted'}`}
+        onClick={onToggle}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          className="accent-primary pointer-events-none"
+        />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function SelectionTable({ outputs, excluded, onToggle, onToggleAll, onExpand }: SelectionTableProps) {
+  const allChecked = excluded.size === 0;
+  const someChecked = excluded.size < outputs.length;
+  return (
+    <Card className="rounded-3xl">
+      <CardHeader>
+        <CardTitle>
+          Images à traiter —{' '}
+          <span className="text-primary">{outputs.length - excluded.size}</span>
+          <span className="text-muted-foreground font-normal"> / {outputs.length}</span>
+        </CardTitle>
+        <p className="text-muted-foreground text-sm">
+          Décochez les images que vous ne souhaitez pas traiter.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <ResizableTableContainer initialHeight={640}>
+          <Table>
+            <TableHeader className="bg-muted/60 sticky top-0">
+              <TableRow>
+                <TableHead className="w-20 min-w-[80px]">Aperçu</TableHead>
+                <TableHead>Fichier de sortie</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead
+                  className="bg-muted sticky right-0 w-24 min-w-[96px] cursor-pointer select-none text-center"
+                  onClick={onToggleAll}
+                >
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={(el) => { if (el) el.indeterminate = !allChecked && someChecked; }}
+                    onChange={onToggleAll}
+                    className="accent-primary pointer-events-none cursor-pointer"
+                    title="Tout cocher / décocher"
+                  />
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {outputs.map((o) => (
+                <SelectionRow
+                  key={o.outPath}
+                  output={o}
+                  checked={!excluded.has(o.outPath)}
+                  onToggle={() => onToggle(o.outPath)}
+                  onExpand={onExpand}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </ResizableTableContainer>
+      </CardContent>
+    </Card>
   );
 }
