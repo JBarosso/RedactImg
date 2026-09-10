@@ -17,6 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dropzone } from '@/components/Dropzone';
+import { EanItems, newEanItem, type EanItem } from '@/components/EanItems';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { Lightbox, ReportPanel, ResizableTableContainer, Stat, Thumbnail, useObjectUrl, type Section } from '@/components/ReportPanel';
 import {
@@ -27,9 +28,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { matchFiles, parseReferences, planOutputs } from '@/lib/matching.js';
+import { manualTasks, matchFiles, parseReferences, planOutputs } from '@/lib/matching.js';
 import type { MatchedOn } from '@/lib/matching.js';
-import { runBatch, type BatchFailure } from '@/lib/pool';
+import { runBatch, type BatchFailure, type BatchItem } from '@/lib/pool';
 import { createWriter, download, hasFileSystemAccess } from '@/lib/output';
 import type { Scanned } from '@/lib/scan';
 import { useSettings, useTheme } from '@/lib/settings';
@@ -57,6 +58,8 @@ export default function App() {
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [flatOutput, setFlatOutput] = useState(false);
   const [lightboxFile, setLightboxFile] = useState<File | null>(null);
+  const [eanItems, setEanItems] = useState<EanItem[]>([]);
+  const [soloItems, setSoloItems] = useState<EanItem[]>(() => [newEanItem()]);
   const [result, setResult] = useState<RunResult | null>(null);
   const abort = useRef<AbortController | null>(null);
 
@@ -65,40 +68,55 @@ export default function App() {
     () => matchFiles(files, parsed.refs, { firstOnly: settings.firstOnly }),
     [files, parsed.refs, settings.firstOnly],
   );
+  const tasks = useMemo(() => [...match.tasks, ...manualTasks(eanItems)], [match.tasks, eanItems]);
   const plan = useMemo(
-    () => planOutputs(match.tasks, { ext: settings.format, nameTemplate: settings.nameTemplate }),
-    [match.tasks, settings.format, settings.nameTemplate],
+    () => planOutputs(tasks, { ext: settings.format, nameTemplate: settings.nameTemplate }),
+    [tasks, settings.format, settings.nameTemplate],
   );
 
-  useEffect(() => { setExcluded(new Set()); }, [match.tasks]);
+  useEffect(() => { setExcluded(new Set()); }, [tasks]);
 
 
-  // Traite et télécharge des fichiers non appariés (section "inutilisées").
-  const downloadFiles = useCallback(async (filesToProcess: File[]) => {
-    const ac = new AbortController();
+  const downloadItems = useCallback(async (items: BatchItem[], zipName: string) => {
     const results: { blob: Blob; name: string }[] = [];
-    await runBatch(
-      filesToProcess.map((f) => ({
-        name: f.name.replace(/\.[^.]+$/, '') + '.' + settings.format,
-        file: f,
-        source: f.name,
-      })),
+    const failures = await runBatch(
+      items,
       settings,
       {
         write: async (item, blob) => { results.push({ blob, name: item.name }); },
         onProgress: () => {},
       },
-      ac.signal,
+      new AbortController().signal,
     );
+    if (failures.length) {
+      alert(`${failures.length} image(s) en échec :\n${failures.map((f) => `${f.source} — ${f.error}`).join('\n')}`);
+    }
     if (results.length === 1) {
       download(results[0].blob, results[0].name);
-    } else {
+    } else if (results.length > 1) {
       const entries: Record<string, Uint8Array> = {};
       for (const r of results) entries[r.name] = new Uint8Array(await r.blob.arrayBuffer());
       const zipped = zipSync(entries, { level: 0 });
-      download(new Blob([zipped as unknown as BlobPart], { type: 'application/zip' }), 'redacimg-selection.zip');
+      download(new Blob([zipped as unknown as BlobPart], { type: 'application/zip' }), zipName);
     }
   }, [settings]);
+
+  const downloadFiles = useCallback(
+    (list: File[]) =>
+      downloadItems(
+        list.map((f) => ({ name: f.name.replace(/\.[^.]+$/, '') + '.' + settings.format, file: f, source: f.name })),
+        'redacimg-selection.zip',
+      ),
+    [downloadItems, settings.format],
+  );
+
+  const downloadEan = (list: EanItem[]) => {
+    const { outputs } = planOutputs(manualTasks(list), { ext: settings.format, nameTemplate: settings.nameTemplate });
+    return downloadItems(
+      outputs.map((o) => ({ name: o.name, file: o.file.file, source: o.file.path })),
+      list.length === 1 ? `${outputs[0].ref.ean}.zip` : 'redacimg-ean.zip',
+    );
+  };
 
   const running = progress !== null;
   const selectedOutputs = useMemo(
@@ -144,7 +162,7 @@ export default function App() {
         headers: ['EAN', 'Références', 'Fichiers concernés'],
         rows: plan.collisions.map((c) => [
           c.stem,
-          c.refs.map((r) => `${r.label} (ligne ${r.line})`).join(', '),
+          c.refs.map((r) => (r.line ? `${r.label} (ligne ${r.line})` : r.label)).join(', '),
           c.files.map((f) => f.path).join(', '),
         ]),
       },
@@ -190,7 +208,7 @@ export default function App() {
         rows: plan.withoutEan.map((o) => [o.name, String(o.ref.line), o.file.path]),
       },
     ],
-    [match, plan, parsed, result],
+    [match, plan, parsed, result, downloadFiles],
   );
 
   const start = async () => {
@@ -258,6 +276,7 @@ export default function App() {
           <TabsTrigger value="rapport" className="rounded-xl">
             Rapport{problems > 0 && ` (${problems})`}
           </TabsTrigger>
+          <TabsTrigger value="ean" className="rounded-xl">EAN manuel</TabsTrigger>
         </TabsList>
 
         <TabsContent value="preparer" className="space-y-5">
@@ -297,6 +316,18 @@ export default function App() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="rounded-3xl">
+            <CardHeader>
+              <CardTitle>Ajout manuel par EAN</CardTitle>
+              <p className="text-muted-foreground text-sm">
+                Des images absentes de la liste ? Saisissez leur EAN et déposez-les : elles rejoignent le lot.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <EanItems items={eanItems} onChange={setEanItems} onExpand={setLightboxFile} disabled={running} />
+            </CardContent>
+          </Card>
 
           {plan.outputs.length > 0 && (
             <SelectionTable
@@ -344,9 +375,24 @@ export default function App() {
           )}
           <ReportPanel sections={sections} />
         </TabsContent>
+
+        <TabsContent value="ean">
+          <Card className="rounded-3xl">
+            <CardHeader>
+              <CardTitle>Traitement par EAN</CardTitle>
+              <p className="text-muted-foreground text-sm">
+                Un bloc par produit : ses images sont redimensionnées selon les réglages et nommées
+                avec l'EAN (suffixes _1, _2… s'il y en a plusieurs).
+              </p>
+            </CardHeader>
+            <CardContent>
+              <EanItems items={soloItems} onChange={setSoloItems} onExpand={setLightboxFile} onDownload={downloadEan} />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
-      <div className="bg-background/85 fixed inset-x-0 bottom-0 border-t backdrop-blur">
+      <div className={`bg-background/85 fixed inset-x-0 bottom-0 border-t backdrop-blur ${!running && tab === 'ean' ? 'hidden' : ''}`}>
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 px-4 py-4">
           {running ? (
             <>

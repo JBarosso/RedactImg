@@ -57,3 +57,5 @@ export function planOutputs<F extends ScannedFile>(
   tasks: Task<F>[],
   opts?: { ext?: string; nameTemplate?: string },
 ): OutputPlan<F>;
+export function parseEan(input: string): string | null;
+export function manualTasks<F extends ScannedFile>(items: { ean: string; files: F[] }[]): Task<F>[];

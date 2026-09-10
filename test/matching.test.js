@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseReferences, matchFiles, planOutputs, tokenize, normalizeId } from '../src/lib/matching.js';
+import { parseReferences, matchFiles, planOutputs, tokenize, normalizeId, manualTasks, parseEan } from '../src/lib/matching.js';
 import { FILES, REFS_TEXT } from '../scripts/make-fixtures.mjs';
 
 const files = FILES.map(([path]) => ({ path }));
@@ -151,4 +151,26 @@ test('deux references pour un meme EAN : ecartees, jamais ecrasees', () => {
 
 test('aucun nom de sortie en double dans le plan', () => {
   assert.equal(new Set(plan.outputs.map((o) => o.name)).size, plan.outputs.length);
+});
+
+test('EAN manuel : saisie nettoyée, images seules triées, doublon écarté comme dans la liste', () => {
+  assert.equal(parseEan(' 3023 190010373 '), '3023190010373');
+  assert.equal(parseEan('1234567'), '1234567');
+  assert.equal(parseEan('PRE/TJ5'), null);
+  assert.equal(parseEan('   '), null);
+
+  const tasks = manualTasks([
+    { ean: '3023190010373', files: [{ path: 'b.jpg' }, { path: 'notes.txt' }, { path: 'a.png' }] },
+    { ean: 'a/b', files: [{ path: 'c.jpg' }] },
+    { ean: '3023190010373', files: [{ path: 'd.jpg' }] },
+  ]);
+  assert.deepEqual(tasks.map((t) => t.file.path), ['a.png', 'b.jpg', 'd.jpg']);
+  assert.ok(tasks.every((t) => t.ref.line === 0 && t.matchedOn === 'ean'));
+
+  const solo = planOutputs(manualTasks([{ ean: '3023190010373', files: [{ path: 'b.jpg' }, { path: 'a.png' }] }]));
+  assert.deepEqual(solo.outputs.map((o) => o.name), ['3023190010373_1.tif', '3023190010373_2.tif']);
+
+  const dup = planOutputs(tasks);
+  assert.equal(dup.outputs.length, 0);
+  assert.equal(dup.collisions.length, 1);
 });

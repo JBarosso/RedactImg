@@ -227,6 +227,31 @@ export function planOutputs(tasks, { ext = 'tif', nameTemplate = '{ean}' } = {})
   return { outputs, collisions, withoutEan: outputs.filter((o) => !o.namedFromEan) };
 }
 
+/**
+ * EAN saisi à la main, sans contrainte de longueur : espaces retirés.
+ * null si vide ou si un caractère est interdit dans un nom de fichier.
+ */
+export function parseEan(input) {
+  const ean = input.replace(/\s+/g, '');
+  return ean && !/[\\/:*?"<>|]/.test(ean) ? ean : null;
+}
+
+/**
+ * Blocs « EAN manuel » -> tâches, à fusionner avec celles du matching avant
+ * `planOutputs` : nommage, suffixes et collisions restent gérés au même endroit.
+ * `line` vaut 0 : ces refs ne viennent pas de la liste collée.
+ *
+ * @param {{ean: string, files: {path:string}[]}[]} items
+ */
+export function manualTasks(items) {
+  return items.flatMap((item, i) => {
+    const ean = parseEan(item.ean);
+    if (!ean) return [];
+    const ref = { line: 0, raw: ean, code: null, ean, label: `EAN manuel n°${i + 1}`, warnings: [] };
+    return matchFiles(item.files, []).unused.map((file) => ({ ref, file, matchedOn: 'ean' }));
+  });
+}
+
 function strip({ tokens, ...file }) {
   return file;
 }
