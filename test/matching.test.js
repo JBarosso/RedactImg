@@ -96,6 +96,18 @@ test('références introuvables, en distinguant celles écartées pour ambiguït
   );
 });
 
+test('référence introuvable dont les fichiers existent en format non supporté : on le dit', () => {
+  const { refs: r } = parseReferences('X 3661276192126\nY 3023190010373');
+  const m = matchFiles(
+    [{ path: 'd/3661276192126_1.tif' }, { path: 'd/3661276192126_2.TIF' }, { path: 'd/autre.tif' }],
+    r,
+  );
+  assert.deepEqual(
+    m.missing.map((x) => [x.ref.label, x.unsupported.map((f) => f.path)]),
+    [['X', ['d/3661276192126_1.tif', 'd/3661276192126_2.TIF']], ['Y', []]],
+  );
+});
+
 test('une référence ponctuée dans la liste matche le fichier sans ponctuation', () => {
   assert.equal(result.tasks.find((t) => t.ref.label === 'PRQ-M4').file.path, 'Photos HD/PRQM4.jpg');
   assert.equal(result.tasks.find((t) => t.ref.label === 'PRSOLO1').file.path, 'PRSOLO1.png');

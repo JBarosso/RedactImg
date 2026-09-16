@@ -138,10 +138,8 @@ export function matchFiles(files, refs, { firstOnly = false } = {}) {
   for (const file of scanned) {
     const hits = [];
     for (const ref of refs) {
-      const onCode = Boolean(ref.code) && file.tokens.has(normalizeId(ref.code));
-      const onEan = Boolean(ref.ean) && file.tokens.has(normalizeId(ref.ean));
-      if (!onCode && !onEan) continue;
-      hits.push({ ref, matchedOn: onCode && onEan ? 'both' : onCode ? 'code' : 'ean' });
+      const matchedOn = matchOn(file.tokens, ref);
+      if (matchedOn) hits.push({ ref, matchedOn });
     }
 
     if (hits.length === 0) unused.push(strip(file));
@@ -149,6 +147,7 @@ export function matchFiles(files, refs, { firstOnly = false } = {}) {
     else ambiguous.push({ file: strip(file), refs: hits.map((h) => ({ ref: h.ref, matchedOn: h.matchedOn })) });
   }
 
+  const ignoredTokens = ignored.map((file) => ({ file, tokens: new Set(tokenize(splitPath(file.path).base)) }));
   const tasks = [];
   const missing = [];
   for (const ref of refs) {
@@ -158,6 +157,8 @@ export function matchFiles(files, refs, { firstOnly = false } = {}) {
         ref,
         // Distinction utile : "aucun fichier" vs "des fichiers, mais tous écartés".
         onlyAmbiguous: ambiguous.some((a) => a.refs.some((h) => h.ref === ref)),
+        // Sinon un .tif au bon nom passe pour une référence sans image.
+        unsupported: ignoredTokens.filter((f) => matchOn(f.tokens, ref)).map((f) => f.file),
       });
       continue;
     }
@@ -250,6 +251,12 @@ export function manualTasks(items) {
     const ref = { line: 0, raw: ean, code: null, ean, label: `EAN manuel n°${i + 1}`, warnings: [] };
     return matchFiles(item.files, []).unused.map((file) => ({ ref, file, matchedOn: 'ean' }));
   });
+}
+
+function matchOn(tokens, ref) {
+  const onCode = Boolean(ref.code) && tokens.has(normalizeId(ref.code));
+  const onEan = Boolean(ref.ean) && tokens.has(normalizeId(ref.ean));
+  return onCode && onEan ? 'both' : onCode ? 'code' : onEan ? 'ean' : null;
 }
 
 function strip({ tokens, ...file }) {

@@ -140,7 +140,11 @@ export default function App() {
           String(m.ref.line),
           m.onlyAmbiguous
             ? 'Des fichiers correspondaient, mais tous étaient ambigus'
-            : 'Aucun fichier correspondant',
+            : m.unsupported.length
+              ? `${m.unsupported.length} fichier(s) trouvé(s) mais format non supporté (${[
+                  ...new Set(m.unsupported.map((f) => f.reason.replace(' non supporté', ''))),
+                ].join(', ')}) — JPEG ou PNG uniquement`
+              : 'Aucun fichier correspondant',
         ]),
       },
       {
@@ -183,6 +187,14 @@ export default function App() {
         rows: match.unused.map((f) => [f.path]),
         rowFiles: match.unused.map((f) => f.file),
         onDownload: downloadFiles,
+      },
+      {
+        id: 'ignores',
+        title: 'Fichiers ignorés',
+        hint: 'Présents dans les dossiers mais pas lus : seuls les JPEG et PNG sont traités.',
+        tone: 'info',
+        headers: ['Fichier', 'Motif'],
+        rows: match.ignored.map((f) => [f.path, f.reason]),
       },
       {
         id: 'lignes',

@@ -24,7 +24,7 @@ export type Task<F extends ScannedFile = ScannedFile> = {
 
 export type MatchResult<F extends ScannedFile = ScannedFile> = {
   tasks: Task<F>[];
-  missing: { ref: Ref; onlyAmbiguous: boolean }[];
+  missing: { ref: Ref; onlyAmbiguous: boolean; unsupported: (F & { reason: string })[] }[];
   unused: F[];
   ambiguous: { file: F; refs: { ref: Ref; matchedOn: MatchedOn }[] }[];
   ignored: (F & { reason: string })[];
