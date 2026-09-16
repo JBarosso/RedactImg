@@ -11,7 +11,7 @@ Outil interne de traitement d'images produit. Glissez un dossier, collez votre l
 
 ## Ce que ça fait
 
-1. **Scan** — glissez un ou plusieurs dossiers (récursif). JPEG et PNG.
+1. **Scan** — glissez un ou plusieurs dossiers (récursif). JPEG, PNG, TIFF et AVIF.
 2. **Correspondance** — collez votre liste `code interne + EAN` (copier-coller depuis Excel). Chaque image est associée à la bonne référence par son nom de fichier.
 3. **Traitement** — redimensionnement, recadrage, fond configurable, export en TIFF / JPEG / PNG / WebP.
 4. **Rapport** — CSV en trois sections : introuvables, ambiguës, inutilisées.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, GripHorizontal, PartyPopper } from 'lucide-react';
+import { Download, GripHorizontal, ImageOff, Loader2, PartyPopper } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { download, toCsv } from '@/lib/output';
+import { decodedPreview, needsDecode } from '@/lib/preview';
 
 export type Section = {
   id: string;
@@ -32,34 +33,69 @@ const TONE = {
 } as const;
 
 // ── Thumbnail ──────────────────────────────────────────────────────────────
-// Crée et révoque son propre object URL. Passe le File (pas l'URL) à onExpand
-// pour que la lightbox gère sa propre URL indépendamment.
-export function useObjectUrl(file: File) {
-  const [url, setUrl] = useState('');
+// Passe le File (pas l'URL) à onExpand pour que la lightbox gère sa propre URL.
+function usePreviewUrl(file: File | null, size: number) {
+  const [state, setState] = useState({ url: '', failed: false });
   useEffect(() => {
-    const u = URL.createObjectURL(file);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
-  return url;
+    if (!file) return;
+    if (!needsDecode(file)) {
+      const url = URL.createObjectURL(file);
+      setState({ url, failed: false });
+      return () => URL.revokeObjectURL(url);
+    }
+    let alive = true;
+    decodedPreview(file, size).then(
+      (url) => alive && setState({ url, failed: false }),
+      () => alive && setState({ url: '', failed: true }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [file, size]);
+  return state;
 }
 
 export function Thumbnail({ file, onExpand }: { file: File; onExpand: (f: File) => void }) {
-  const url = useObjectUrl(file);
-  if (!url) return <div className="size-16 rounded-[6px] bg-muted animate-pulse" />;
+  const box = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  // Aperçu chargé à l'affichage : un dossier de 200 TIFF ne se décode pas d'un coup.
+  useEffect(() => {
+    const io = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setVisible(true);
+      io.disconnect();
+    });
+    io.observe(box.current!);
+    return () => io.disconnect();
+  }, []);
+  const { url, failed } = usePreviewUrl(visible ? file : null, 256);
+
   return (
-    <img
-      src={url}
-      alt=""
-      className="size-16 cursor-zoom-in rounded-[6px] object-cover"
-      onClick={() => onExpand(file)}
-    />
+    <div ref={box} className="size-16 shrink-0">
+      {url ? (
+        <img
+          src={url}
+          alt=""
+          className="size-16 cursor-zoom-in rounded-[6px] object-cover"
+          onClick={() => onExpand(file)}
+        />
+      ) : failed ? (
+        <div
+          title="Aperçu impossible"
+          className="bg-muted text-muted-foreground flex size-16 items-center justify-center rounded-[6px]"
+        >
+          <ImageOff className="size-5" />
+        </div>
+      ) : (
+        <div className="bg-muted size-16 animate-pulse rounded-[6px]" />
+      )}
+    </div>
   );
 }
 
 // ── Lightbox ───────────────────────────────────────────────────────────────
 export function Lightbox({ file, onClose }: { file: File; onClose: () => void }) {
-  const url = useObjectUrl(file);
+  const { url, failed } = usePreviewUrl(file, 2048);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -75,12 +111,18 @@ export function Lightbox({ file, onClose }: { file: File; onClose: () => void })
       style={{ height: '100svh' }}
       onClick={onClose}
     >
-      <img
-        src={url}
-        alt=""
-        style={{ height: '100%', width: 'auto' }}
-        onClick={(e) => e.stopPropagation()}
-      />
+      {url ? (
+        <img
+          src={url}
+          alt=""
+          style={{ height: '100%', width: 'auto' }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : failed ? (
+        <p className="text-white">Aperçu impossible</p>
+      ) : (
+        <Loader2 className="size-10 animate-spin text-white" />
+      )}
     </div>
   );
 }

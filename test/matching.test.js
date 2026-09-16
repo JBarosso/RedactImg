@@ -96,15 +96,25 @@ test('références introuvables, en distinguant celles écartées pour ambiguït
   );
 });
 
+test('TIFF et AVIF sont lus comme les JPEG et PNG', () => {
+  const { refs: r } = parseReferences('X 3661276192126');
+  const m = matchFiles(
+    [{ path: 'd/3661276192126_1.tif' }, { path: 'd/3661276192126_2.TIFF' }, { path: 'd/3661276192126_3.avif' }],
+    r,
+  );
+  assert.deepEqual(m.tasks.map((t) => t.file.path), ['d/3661276192126_1.tif', 'd/3661276192126_2.TIFF', 'd/3661276192126_3.avif']);
+  assert.equal(m.ignored.length, 0);
+});
+
 test('référence introuvable dont les fichiers existent en format non supporté : on le dit', () => {
   const { refs: r } = parseReferences('X 3661276192126\nY 3023190010373');
   const m = matchFiles(
-    [{ path: 'd/3661276192126_1.tif' }, { path: 'd/3661276192126_2.TIF' }, { path: 'd/autre.tif' }],
+    [{ path: 'd/3661276192126_1.psd' }, { path: 'd/3661276192126_2.PSD' }, { path: 'd/autre.psd' }],
     r,
   );
   assert.deepEqual(
     m.missing.map((x) => [x.ref.label, x.unsupported.map((f) => f.path)]),
-    [['X', ['d/3661276192126_1.tif', 'd/3661276192126_2.TIF']], ['Y', []]],
+    [['X', ['d/3661276192126_1.psd', 'd/3661276192126_2.PSD']], ['Y', []]],
   );
 });
 

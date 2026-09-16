@@ -2,7 +2,7 @@
 // Aucune dépendance, aucune API navigateur : testable sous `node --test`,
 // importable tel quel dans l'app.
 
-const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png']);
+const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'tif', 'tiff', 'avif']);
 const SEP = /[^\p{L}\p{N}]+/gu;
 const collator = new Intl.Collator('fr', { numeric: true, sensitivity: 'base' });
 

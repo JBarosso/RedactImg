@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { encodeTiff } from '@/lib/tiff';
+import { decodeTiff, encodeTiff } from '@/lib/tiff';
 import type { Settings } from '@/lib/settings';
 
 export type Job = { id: number; file: File; settings: Settings };
@@ -37,10 +37,45 @@ function geometry(sw: number, sh: number, s: Settings) {
   };
 }
 
-async function process({ file, settings }: Job) {
+// Matrices [a, b, c, d, e, f] pour Orientation 2 à 8, e et f en fraction de la
+// taille de sortie : x' = a·x + c·y + e·w, y' = b·x + d·y + f·h.
+const ORIENTATION = [
+  [-1, 0, 0, 1, 1, 0],
+  [-1, 0, 0, -1, 1, 1],
+  [1, 0, 0, -1, 0, 1],
+  [0, 1, 1, 0, 0, 0],
+  [0, 1, -1, 0, 1, 0],
+  [0, -1, -1, 0, 1, 1],
+  [0, -1, 1, 0, 0, 1],
+] as const;
+
+async function decode(file: File): Promise<ImageBitmap> {
+  // Détection par signature, pas par extension : un .tif mal nommé passe quand même.
+  const [a, b, c, d] = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const tiff = (a === 0x49 && b === 0x49 && c === 42 && d === 0) || (a === 0x4d && b === 0x4d && c === 0 && d === 42);
   // `from-image` applique l'orientation EXIF : sans ça les photos prises
-  // à la verticale ressortent couchées.
-  let bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  // à la verticale ressortent couchées. JPEG, PNG et AVIF sont natifs.
+  if (!tiff) return createImageBitmap(file, { imageOrientation: 'from-image' });
+
+  const { rgba, width, height, orientation } = decodeTiff(await file.arrayBuffer());
+  const bmp = await createImageBitmap(
+    new ImageData(new Uint8ClampedArray(rgba.buffer as ArrayBuffer, rgba.byteOffset, rgba.length), width, height),
+  );
+  const m = ORIENTATION[orientation - 2];
+  if (!m) return bmp;
+
+  // Un ImageData n'a pas d'EXIF : l'orientation TIFF s'applique à la main.
+  const swap = orientation >= 5;
+  const canvas = new OffscreenCanvas(swap ? height : width, swap ? width : height);
+  const ctx = canvas.getContext('2d')!;
+  ctx.setTransform(m[0], m[1], m[2], m[3], m[4] * canvas.width, m[5] * canvas.height);
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close();
+  return createImageBitmap(canvas);
+}
+
+async function process({ file, settings }: Job) {
+  let bmp = await decode(file);
   const geo = geometry(bmp.width, bmp.height, settings);
 
   // Réduction en plusieurs demi-passes : un downscale direct d'un facteur 8

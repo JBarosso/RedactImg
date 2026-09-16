@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dropzone } from '@/components/Dropzone';
 import { EanItems, newEanItem, type EanItem } from '@/components/EanItems';
 import { SettingsPanel } from '@/components/SettingsPanel';
-import { Lightbox, ReportPanel, ResizableTableContainer, Stat, Thumbnail, useObjectUrl, type Section } from '@/components/ReportPanel';
+import { Lightbox, ReportPanel, ResizableTableContainer, Stat, Thumbnail, type Section } from '@/components/ReportPanel';
 import {
   Table,
   TableBody,
@@ -143,7 +143,7 @@ export default function App() {
             : m.unsupported.length
               ? `${m.unsupported.length} fichier(s) trouvé(s) mais format non supporté (${[
                   ...new Set(m.unsupported.map((f) => f.reason.replace(' non supporté', ''))),
-                ].join(', ')}) — JPEG ou PNG uniquement`
+                ].join(', ')}) — formats lus : JPEG, PNG, TIFF, AVIF`
               : 'Aucun fichier correspondant',
         ]),
       },
@@ -191,7 +191,7 @@ export default function App() {
       {
         id: 'ignores',
         title: 'Fichiers ignorés',
-        hint: 'Présents dans les dossiers mais pas lus : seuls les JPEG et PNG sont traités.',
+        hint: 'Présents dans les dossiers mais pas lus : seuls les JPEG, PNG, TIFF et AVIF sont traités.',
         tone: 'info',
         headers: ['Fichier', 'Motif'],
         rows: match.ignored.map((f) => [f.path, f.reason]),

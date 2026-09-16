@@ -3,7 +3,29 @@
 // UTIF.js n'encode qu'en non compressé et en RGBA : pour du Deflate il aurait
 // fallu réécrire l'IFD par-dessus. Autant l'écrire directement — ~80 lignes,
 // et la compression passe par CompressionStream, natif dans le navigateur.
-// Résultat : ni UTIF ni pako en dépendance.
+//
+// Le décodage, lui, passe par UTIF : Chrome et Firefox ne lisent pas le TIFF,
+// et les fichiers réels mélangent LZW, JPEG, 16 bits, CMYK… hors de portée
+// d'un décodeur maison.
+import UTIF from 'utif2';
+
+const tag = (ifd: UTIF.IFD, n: number) => Number((ifd[`t${n}`] as number[] | undefined)?.[0] ?? 0);
+
+/** TIFF -> RGBA 8 bits. `orientation` : tag 274, à appliquer par l'appelant. */
+export function decodeTiff(buffer: ArrayBuffer) {
+  // UTIF ne lève rien sur un fichier corrompu : il rend des pages vides.
+  const pages = UTIF.decode(buffer).filter((ifd) => tag(ifd, 256) > 0 && tag(ifd, 257) > 0);
+  if (!pages.length) throw new Error('TIFF illisible : aucune image trouvée');
+  // Certains fichiers rangent une miniature avant l'image : la plus grande page gagne.
+  const ifd = pages.reduce((a, b) => (tag(b, 256) * tag(b, 257) > tag(a, 256) * tag(a, 257) ? b : a));
+  UTIF.decodeImage(buffer, ifd);
+  return {
+    rgba: UTIF.toRGBA8(ifd),
+    width: ifd.width,
+    height: ifd.height,
+    orientation: tag(ifd, 274) || 1,
+  };
+}
 
 const HEADER = 8;
 const ENTRIES = 13;

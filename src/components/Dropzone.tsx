@@ -49,7 +49,7 @@ export function Dropzone({ files, images, onAdd, onClear, disabled }: Props) {
 
       <p className="text-lg font-semibold">Déposez ici vos dossiers d'images</p>
       <p className="text-muted-foreground mt-1 text-sm">
-        Les sous-dossiers sont parcourus automatiquement. JPEG et PNG.
+        Les sous-dossiers sont parcourus automatiquement. JPEG, PNG, TIFF et AVIF.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">

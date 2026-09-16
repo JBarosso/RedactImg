@@ -221,7 +221,7 @@ function EanRow({
         ref={filesInput}
         type="file"
         multiple
-        accept="image/jpeg,image/png"
+        accept="image/jpeg,image/png,image/tiff,image/avif,.tif,.tiff,.avif"
         className="hidden"
         onChange={onPick}
       />

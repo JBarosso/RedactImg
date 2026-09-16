@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inflateSync } from 'node:zlib';
-import { encodeTiff } from '../src/lib/tiff.ts';
+import UTIF from 'utif2';
+import { decodeTiff, encodeTiff } from '../src/lib/tiff.ts';
 
 const W = 3;
 const H = 2;
@@ -68,6 +69,21 @@ test('TIFF Deflate : flux zlib relisible, pixels identiques', async () => {
   const offset = tags.get(273).value;
   const strip = buf.subarray(offset, offset + tags.get(279).value);
   assert.deepEqual(inflateSync(strip), expectedRgb);
+});
+
+test('décodage : nos TIFF (brut et Deflate) se relisent pixel pour pixel', async () => {
+  for (const deflate of [false, true]) {
+    const out = decodeTiff(await (await encodeTiff(rgba, W, H, deflate)).arrayBuffer());
+    assert.deepEqual([out.width, out.height, out.orientation], [W, H, 1]);
+    assert.deepEqual([...out.rgba], [...rgba], deflate ? 'Deflate' : 'brut');
+  }
+});
+
+test('décodage : orientation lue (appliquée par le worker), fichier non TIFF refusé', () => {
+  const oriented = decodeTiff(UTIF.encodeImage(new Uint8Array(4 * 3 * 4).fill(200), 4, 3, { t274: [6] }));
+  assert.deepEqual([oriented.width, oriented.height, oriented.orientation], [4, 3, 6]);
+  assert.equal(oriented.rgba[0], 200);
+  assert.throws(() => decodeTiff(new ArrayBuffer(8)));
 });
 
 test('les tags sont triés par numéro croissant, comme l exige la spec TIFF', async () => {

@@ -9,7 +9,7 @@ type Handlers = {
   onProgress(done: number, label: string): void;
 };
 
-const newWorker = () =>
+export const newWorker = () =>
   new Worker(new URL('../workers/process.worker.ts', import.meta.url), { type: 'module' });
 
 /**
@@ -58,7 +58,7 @@ export async function runBatch(
   return failures;
 }
 
-function runOne(worker: Worker, job: Job, signal: AbortSignal): Promise<Done> {
+export function runOne(worker: Worker, job: Job, signal: AbortSignal): Promise<Done> {
   return new Promise((resolve, reject) => {
     const cleanup = () => {
       worker.onmessage = null;
